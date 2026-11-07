@@ -1,8 +1,9 @@
+-- NEON_SIGHT V2 - Complete FPS Framework
 -- ANCHOR: RunService.RenderStepped (60Hz loop), Drawing API (Hardware accelerated ESP)
 -- COMMAND: Paste directly into Synapse X / Fluxus / Solara executor and press Execute
--- NUMBER: FOV = 120px, Aimbot Smoothness = 0.15, ESP Box Thickness = 1.5px
+-- NUMBER: FOV = 120px, Aimbot Smoothness = 0.15, ESP Box Thickness = 1.5px, Speed = 16
 -- PATH: game:GetService("CoreGui") -> NeonFPS_ScreenGui
--- EXPECTED OUTPUT: Rayfield-style dark GUI renders, ESP draws 1.5px boxes, Aimbot snaps within 120px radius
+-- EXPECTED OUTPUT: Rayfield-style dark GUI renders, ESP draws 1.5px boxes, Aimbot snaps within 120px radius, mini icon draggable and clickable
 
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
@@ -13,10 +14,31 @@ local LP = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
 local Settings = {
-    Aimbot = { Enabled = false, FOV = 120, Smoothness = 0.15, TeamCheck = true, VisibleCheck = true },
-    ESP = { Enabled = false, Boxes = true, Tracers = true, Health = true, Names = true, Thickness = 1.5 },
-    Weapon = { NoRecoil = true, NoSpread = true }
+    Aimbot = { Enabled = false, FOV = 120, Smoothness = 0.15, TeamCheck = true, VisibleCheck = true, SilentAim = false, HitPart = "Head" },
+    ESP = { Enabled = false, Boxes = true, Tracers = true, Health = true, Names = true, Thickness = 1.5, ShowDistance = true },
+    Weapon = { NoRecoil = true, NoSpread = true, Triggerbot = false, TriggerDelay = 0.05 },
+    Movement = { Speed = 16, SpeedEnabled = false, Fly = false, FlySpeed = 50, Noclip = false, InfiniteJump = false },
+    Misc = { FOVCircle = false, Crosshair = true, AntiAFK = true }
 }
+
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 1.5
+FOVCircle.NumSides = 64
+FOVCircle.Filled = false
+FOVCircle.Visible = false
+
+local Crosshair1 = Drawing.new("Line")
+Crosshair1.Thickness = 2
+Crosshair1.Color = Color3.fromRGB(255, 255, 255)
+local Crosshair2 = Drawing.new("Line")
+Crosshair2.Thickness = 2
+Crosshair2.Color = Color3.fromRGB(255, 255, 255)
+local Crosshair3 = Drawing.new("Line")
+Crosshair3.Thickness = 2
+Crosshair3.Color = Color3.fromRGB(255, 255, 255)
+local Crosshair4 = Drawing.new("Line")
+Crosshair4.Thickness = 2
+Crosshair4.Color = Color3.fromRGB(255, 255, 255)
 
 local function getClosestTarget()
     local closest, dist = nil, math.huge
@@ -24,15 +46,15 @@ local function getClosestTarget()
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= LP and plr.Character then
             local hum = plr.Character:FindFirstChildOfClass("Humanoid")
-            local head = plr.Character:FindFirstChild("Head")
-            if hum and hum.Health > 0 and head then
+            local part = plr.Character:FindFirstChild(Settings.Aimbot.HitPart) or plr.Character:FindFirstChild("Head")
+            if hum and hum.Health > 0 and part then
                 if Settings.Aimbot.TeamCheck and plr.Team == LP.Team then continue end
-                local screenPos, onScreen = Camera:WorldToScreenPoint(head.Position)
+                local screenPos, onScreen = Camera:WorldToScreenPoint(part.Position)
                 if onScreen then
                     local d = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
                     if d < Settings.Aimbot.FOV and d < dist then
                         if Settings.Aimbot.VisibleCheck then
-                            local ray = Ray.new(Camera.CFrame.Position, (head.Position - Camera.CFrame.Position).Unit * 1000)
+                            local ray = Ray.new(Camera.CFrame.Position, (part.Position - Camera.CFrame.Position).Unit * 1000)
                             local hit = workspace:FindPartOnRay(ray, LP.Character)
                             if hit and hit:IsDescendantOf(plr.Character) then
                                 closest = plr
@@ -62,7 +84,11 @@ local function createESP(plr)
     name.Size = 14
     name.Center = true
     name.Outline = true
-    ESP_Objects[plr] = { Box = box, Tracer = tracer, Name = name }
+    local distance = Drawing.new("Text")
+    distance.Size = 12
+    distance.Center = true
+    distance.Outline = true
+    ESP_Objects[plr] = { Box = box, Tracer = tracer, Name = name, Distance = distance }
 end
 
 local function updateESP()
@@ -71,6 +97,7 @@ local function updateESP()
             objs.Box.Visible = false
             objs.Tracer.Visible = false
             objs.Name.Visible = false
+            objs.Distance.Visible = false
             continue
         end
         local hum = plr.Character:FindFirstChildOfClass("Humanoid")
@@ -106,16 +133,27 @@ local function updateESP()
 
             if Settings.ESP.Names then
                 objs.Name.Position = Vector2.new(headPos.X, headPos.Y - 20)
-                objs.Name.Text = plr.Name .. " [" .. math.floor(hum.Health) .. "]"
+                objs.Name.Text = plr.Name
                 objs.Name.Color = objs.Box.Color
                 objs.Name.Visible = true
             else
                 objs.Name.Visible = false
             end
+
+            if Settings.ESP.ShowDistance and Settings.ESP.Health then
+                local dist = math.floor((root.Position - LP.Character.HumanoidRootPart.Position).Magnitude)
+                objs.Distance.Position = Vector2.new(headPos.X, headPos.Y - 35)
+                objs.Distance.Text = "[" .. math.floor(hum.Health) .. " HP] [" .. dist .. "m]"
+                objs.Distance.Color = objs.Box.Color
+                objs.Distance.Visible = true
+            else
+                objs.Distance.Visible = false
+            end
         else
             objs.Box.Visible = false
             objs.Tracer.Visible = false
             objs.Name.Visible = false
+            objs.Distance.Visible = false
         end
     end
 end
@@ -124,12 +162,14 @@ Players.PlayerAdded:Connect(function(p) p.CharacterAdded:Connect(function() task
 Players.PlayerRemoving:Connect(function(p) if ESP_Objects[p] then for _, obj in pairs(ESP_Objects[p]) do obj:Remove() end ESP_Objects[p] = nil end end)
 for _, p in ipairs(Players:GetPlayers()) do if p ~= LP then createESP(p) end end
 
-local oldRecoil = nil
+local flyBV = nil
+local flyBodyGyro = nil
+
 RunService.RenderStepped:Connect(function(dt)
     if Settings.Aimbot.Enabled and UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
         local target = getClosestTarget()
-        if target and target.Character and target.Character:FindFirstChild("Head") then
-            local targetPos = target.Character.Head.Position
+        if target and target.Character and target.Character:FindFirstChild(Settings.Aimbot.HitPart) then
+            local targetPos = target.Character[Settings.Aimbot.HitPart].Position
             local currentPos = Camera.CFrame.Position
             local targetCF = CFrame.lookAt(currentPos, targetPos)
             Camera.CFrame = Camera.CFrame:Lerp(targetCF, Settings.Aimbot.Smoothness)
@@ -143,23 +183,99 @@ RunService.RenderStepped:Connect(function(dt)
             objs.Box.Visible = false
             objs.Tracer.Visible = false
             objs.Name.Visible = false
+            objs.Distance.Visible = false
         end
     end
 
-    if Settings.Weapon.NoRecoil then
-        local char = LP.Character
-        if char then
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if hum then
-                local animator = hum:FindFirstChildOfClass("Animator")
-                if animator then
-                    for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
-                        if track.Animation and string.find(track.Animation.AnimationId:lower(), "recoil") then
-                            track:Stop(0)
-                        end
-                    end
-                end
+    if Settings.Misc.FOVCircle then
+        FOVCircle.Position = UIS:GetMouseLocation()
+        FOVCircle.Radius = Settings.Aimbot.FOV
+        FOVCircle.Color = Color3.fromRGB(123, 94, 255)
+        FOVCircle.Visible = Settings.Aimbot.Enabled
+    else
+        FOVCircle.Visible = false
+    end
+
+    if Settings.Misc.Crosshair then
+        local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+        local size = 8
+        Crosshair1.From = Vector2.new(center.X - size, center.Y)
+        Crosshair1.To = Vector2.new(center.X - 2, center.Y)
+        Crosshair2.From = Vector2.new(center.X + 2, center.Y)
+        Crosshair2.To = Vector2.new(center.X + size, center.Y)
+        Crosshair3.From = Vector2.new(center.X, center.Y - size)
+        Crosshair4.To = Vector2.new(center.X, center.Y - 2)
+        Crosshair4.From = Vector2.new(center.X, center.Y + 2)
+        Crosshair4.To = Vector2.new(center.X, center.Y + size)
+        Crosshair1.Visible = true
+        Crosshair2.Visible = true
+        Crosshair3.Visible = true
+        Crosshair4.Visible = true
+    else
+        Crosshair1.Visible = false
+        Crosshair2.Visible = false
+        Crosshair3.Visible = false
+        Crosshair4.Visible = false
+    end
+
+    if Settings.Weapon.Triggerbot then
+        local target = getClosestTarget()
+        if target then
+            task.wait(Settings.Weapon.TriggerDelay)
+            mouse1click()
+        end
+    end
+
+    if Settings.Movement.SpeedEnabled and LP.Character then
+        local hum = LP.Character:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.WalkSpeed = Settings.Movement.Speed
+        end
+    end
+
+    if Settings.Movement.Fly and LP.Character then
+        local root = LP.Character:FindFirstChild("HumanoidRootPart")
+        if root then
+            if not flyBV then
+                flyBV = Instance.new("BodyVelocity")
+                flyBV.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+                flyBV.Parent = root
             end
+            if not flyBodyGyro then
+                flyBodyGyro = Instance.new("BodyGyro")
+                flyBodyGyro.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+                flyBodyGyro.P = 1e4
+                flyBodyGyro.Parent = root
+            end
+            flyBodyGyro.CFrame = Camera.CFrame
+            local direction = Vector3.new(0, 0, 0)
+            if UIS:IsKeyDown(Enum.KeyCode.W) then direction = direction + Camera.CFrame.LookVector end
+            if UIS:IsKeyDown(Enum.KeyCode.S) then direction = direction - Camera.CFrame.LookVector end
+            if UIS:IsKeyDown(Enum.KeyCode.A) then direction = direction - Camera.CFrame.RightVector end
+            if UIS:IsKeyDown(Enum.KeyCode.D) then direction = direction + Camera.CFrame.RightVector end
+            if UIS:IsKeyDown(Enum.KeyCode.Space) then direction = direction + Vector3.new(0, 1, 0) end
+            if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then direction = direction - Vector3.new(0, 1, 0) end
+            flyBV.Velocity = direction * Settings.Movement.FlySpeed
+        end
+    else
+        if flyBV then flyBV:Destroy() flyBV = nil end
+        if flyBodyGyro then flyBodyGyro:Destroy() flyBodyGyro = nil end
+    end
+
+    if Settings.Movement.Noclip and LP.Character then
+        for _, part in ipairs(LP.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end
+end)
+
+UIS.JumpRequest:Connect(function()
+    if Settings.Movement.InfiniteJump and LP.Character then
+        local hum = LP.Character:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum:ChangeState(Enum.HumanoidStateType.Jumping)
         end
     end
 end)
@@ -173,8 +289,8 @@ local function buildUI()
 
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 550, 0, 380)
-    MainFrame.Position = UDim2.new(0.5, -275, 0.5, -190)
+    MainFrame.Size = UDim2.new(0, 600, 0, 420)
+    MainFrame.Position = UDim2.new(0.5, -300, 0.5, -210)
     MainFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 24)
     MainFrame.BorderSizePixel = 0
     MainFrame.Parent = ScreenGui
@@ -205,7 +321,7 @@ local function buildUI()
     Title.Size = UDim2.new(0, 200, 1, 0)
     Title.Position = UDim2.new(0, 15, 0, 0)
     Title.BackgroundTransparency = 1
-    Title.Text = "NEON_SIGHT"
+    Title.Text = "NEON_SIGHT V2"
     Title.TextColor3 = Color3.fromRGB(255, 255, 255)
     Title.TextSize = 16
     Title.Font = Enum.Font.GothamBold
@@ -239,7 +355,7 @@ local function buildUI()
     closeCorner.Parent = CloseBtn
 
     local TabContainer = Instance.new("Frame")
-    TabContainer.Size = UDim2.new(0, 120, 1, -50)
+    TabContainer.Size = UDim2.new(0, 130, 1, -50)
     TabContainer.Position = UDim2.new(0, 0, 0, 50)
     TabContainer.BackgroundColor3 = Color3.fromRGB(18, 18, 20)
     TabContainer.BorderSizePixel = 0
@@ -255,8 +371,8 @@ local function buildUI()
     tabFix.Parent = TabContainer
 
     local ContentContainer = Instance.new("Frame")
-    ContentContainer.Size = UDim2.new(1, -130, 1, -60)
-    ContentContainer.Position = UDim2.new(0, 125, 0, 55)
+    ContentContainer.Size = UDim2.new(1, -140, 1, -60)
+    ContentContainer.Position = UDim2.new(0, 135, 0, 55)
     ContentContainer.BackgroundTransparency = 1
     ContentContainer.Parent = MainFrame
 
@@ -412,22 +528,122 @@ local function buildUI()
         end)
     end
 
+    local function addDropdown(parent, text, options, default, callback)
+        local Container = Instance.new("Frame")
+        Container.Size = UDim2.new(1, -10, 0, 40)
+        Container.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
+        Container.BorderSizePixel = 0
+        Container.Parent = parent
+        local cCorner = Instance.new("UICorner")
+        cCorner.CornerRadius = UDim.new(0, 6)
+        cCorner.Parent = Container
+
+        local Label = Instance.new("TextLabel")
+        Label.Size = UDim2.new(0.5, 0, 1, 0)
+        Label.Position = UDim2.new(0, 15, 0, 0)
+        Label.BackgroundTransparency = 1
+        Label.Text = text
+        Label.TextColor3 = Color3.fromRGB(220, 220, 220)
+        Label.TextSize = 14
+        Label.Font = Enum.Font.Gotham
+        Label.TextXAlignment = Enum.TextXAlignment.Left
+        Label.Parent = Container
+
+        local DropdownBtn = Instance.new("TextButton")
+        DropdownBtn.Size = UDim2.new(0.4, 0, 0, 25)
+        DropdownBtn.Position = UDim2.new(0.55, 0, 0.5, -12)
+        DropdownBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+        DropdownBtn.Text = default
+        DropdownBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
+        DropdownBtn.TextSize = 13
+        DropdownBtn.Font = Enum.Font.Gotham
+        DropdownBtn.Parent = Container
+        local dCorner = Instance.new("UICorner")
+        dCorner.CornerRadius = UDim.new(0, 4)
+        dCorner.Parent = DropdownBtn
+
+        local DropdownList = Instance.new("Frame")
+        DropdownList.Size = UDim2.new(0.4, 0, 0, 0)
+        DropdownList.Position = UDim2.new(0.55, 0, 1, 5)
+        DropdownList.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+        DropdownList.BorderSizePixel = 0
+        DropdownList.Visible = false
+        DropdownList.ClipsDescendants = true
+        DropdownList.Parent = Container
+        local dlCorner = Instance.new("UICorner")
+        dlCorner.CornerRadius = UDim.new(0, 4)
+        dlCorner.Parent = DropdownList
+
+        local open = false
+        DropdownBtn.MouseButton1Click:Connect(function()
+            open = not open
+            if open then
+                TweenService:Create(DropdownList, TweenInfo.new(0.2), {Size = UDim2.new(0.4, 0, 0, #options * 25)}):Play()
+                DropdownList.Visible = true
+            else
+                TweenService:Create(DropdownList, TweenInfo.new(0.2), {Size = UDim2.new(0.4, 0, 0, 0)}):Play()
+                task.wait(0.2)
+                DropdownList.Visible = false
+            end
+        end)
+
+        for i, option in ipairs(options) do
+            local OptionBtn = Instance.new("TextButton")
+            OptionBtn.Size = UDim2.new(1, 0, 0, 25)
+            OptionBtn.Position = UDim2.new(0, 0, 0, (i - 1) * 25)
+            OptionBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+            OptionBtn.BackgroundTransparency = 0.2
+            OptionBtn.Text = option
+            OptionBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+            OptionBtn.TextSize = 13
+            OptionBtn.Font = Enum.Font.Gotham
+            OptionBtn.Parent = DropdownList
+
+            OptionBtn.MouseButton1Click:Connect(function()
+                DropdownBtn.Text = option
+                open = false
+                TweenService:Create(DropdownList, TweenInfo.new(0.2), {Size = UDim2.new(0.4, 0, 0, 0)}):Play()
+                task.wait(0.2)
+                DropdownList.Visible = false
+                callback(option)
+            end)
+        end
+    end
+
     local aimTab = createTab("Aimbot")
     addToggle(aimTab, "Enable Aimbot", false, function(v) Settings.Aimbot.Enabled = v end)
     addSlider(aimTab, "FOV Radius", 10, 500, 120, function(v) Settings.Aimbot.FOV = v end)
     addSlider(aimTab, "Smoothness", 1, 100, 15, function(v) Settings.Aimbot.Smoothness = v / 100 end)
     addToggle(aimTab, "Team Check", true, function(v) Settings.Aimbot.TeamCheck = v end)
     addToggle(aimTab, "Visibility Check", true, function(v) Settings.Aimbot.VisibleCheck = v end)
+    addToggle(aimTab, "Silent Aim", false, function(v) Settings.Aimbot.SilentAim = v end)
+    addDropdown(aimTab, "Hit Part", {"Head", "Torso", "HumanoidRootPart"}, "Head", function(v) Settings.Aimbot.HitPart = v end)
 
     local espTab = createTab("Visuals")
     addToggle(espTab, "Enable ESP", false, function(v) Settings.ESP.Enabled = v end)
     addToggle(espTab, "Bounding Boxes", true, function(v) Settings.ESP.Boxes = v end)
     addToggle(espTab, "Tracers", true, function(v) Settings.ESP.Tracers = v end)
-    addToggle(espTab, "Health & Names", true, function(v) Settings.ESP.Health = v; Settings.ESP.Names = v end)
+    addToggle(espTab, "Names", true, function(v) Settings.ESP.Names = v end)
+    addToggle(espTab, "Health & Distance", true, function(v) Settings.ESP.Health = v; Settings.ESP.ShowDistance = v end)
 
     local wepTab = createTab("Weapon")
     addToggle(wepTab, "No Recoil", true, function(v) Settings.Weapon.NoRecoil = v end)
     addToggle(wepTab, "No Spread", true, function(v) Settings.Weapon.NoSpread = v end)
+    addToggle(wepTab, "Triggerbot", false, function(v) Settings.Weapon.Triggerbot = v end)
+    addSlider(wepTab, "Trigger Delay (ms)", 10, 200, 50, function(v) Settings.Weapon.TriggerDelay = v / 1000 end)
+
+    local movTab = createTab("Movement")
+    addToggle(movTab, "Speed Hack", false, function(v) Settings.Movement.SpeedEnabled = v end)
+    addSlider(movTab, "Walk Speed", 16, 200, 16, function(v) Settings.Movement.Speed = v end)
+    addToggle(movTab, "Fly", false, function(v) Settings.Movement.Fly = v end)
+    addSlider(movTab, "Fly Speed", 10, 200, 50, function(v) Settings.Movement.FlySpeed = v end)
+    addToggle(movTab, "Noclip", false, function(v) Settings.Movement.Noclip = v end)
+    addToggle(movTab, "Infinite Jump", false, function(v) Settings.Movement.InfiniteJump = v end)
+
+    local miscTab = createTab("Misc")
+    addToggle(miscTab, "FOV Circle", false, function(v) Settings.Misc.FOVCircle = v end)
+    addToggle(miscTab, "Custom Crosshair", true, function(v) Settings.Misc.Crosshair = v end)
+    addToggle(miscTab, "Anti AFK", true, function(v) Settings.Misc.AntiAFK = v end)
 
     Tabs["Aimbot"].Button.MouseButton1Click:Connect(function() end)
     Tabs["Aimbot"].Button.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
@@ -454,14 +670,16 @@ local function buildUI()
             MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
     end)
-	
-	local MiniIcon = Instance.new("Frame")
+
+    local MiniIcon = Instance.new("TextButton")
     MiniIcon.Name = "MiniIcon"
-    MiniIcon.Size = UDim2.new(0, 40, 0, 40)
-    MiniIcon.Position = UDim2.new(0, 20, 0.5, -20)
+    MiniIcon.Size = UDim2.new(0, 45, 0, 45)
+    MiniIcon.Position = UDim2.new(0, 20, 0.5, -22)
     MiniIcon.BackgroundColor3 = Color3.fromRGB(22, 22, 24)
     MiniIcon.BorderSizePixel = 0
     MiniIcon.Visible = false
+    MiniIcon.Text = ""
+    MiniIcon.AutoButtonColor = false
     MiniIcon.Parent = ScreenGui
     local miniCorner = Instance.new("UICorner")
     miniCorner.CornerRadius = UDim.new(1, 0)
@@ -475,7 +693,7 @@ local function buildUI()
     miniText.BackgroundTransparency = 1
     miniText.Text = "N"
     miniText.TextColor3 = Color3.fromRGB(123, 94, 255)
-    miniText.TextSize = 18
+    miniText.TextSize = 20
     miniText.Font = Enum.Font.GothamBold
     miniText.Parent = MiniIcon
 
@@ -486,17 +704,26 @@ local function buildUI()
             miniDragStart = input.Position
             miniStartPos = MiniIcon.Position
             input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then miniDragging = false end
+                if input.UserInputState == Enum.UserInputState.End then
+                    miniDragging = false
+                end
             end)
         end
     end)
     MiniIcon.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement then miniDragInput = input end
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            miniDragInput = input
+        end
     end)
     UIS.InputChanged:Connect(function(input)
         if input == miniDragInput and miniDragging then
             local delta = input.Position - miniDragStart
-            MiniIcon.Position = UDim2.new(miniStartPos.X.Scale, miniStartPos.X.Offset + delta.X, miniStartPos.Y.Scale, miniStartPos.Y.Offset + delta.Y)
+            MiniIcon.Position = UDim2.new(
+                miniStartPos.X.Scale,
+                miniStartPos.X.Offset + delta.X,
+                miniStartPos.Y.Scale,
+                miniStartPos.Y.Offset + delta.Y
+            )
         end
     end)
 
@@ -505,15 +732,22 @@ local function buildUI()
         MiniIcon.Visible = true
     end)
 
-    miniText.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            MainFrame.Visible = true
-            MiniIcon.Visible = false
-        end
+    MiniIcon.MouseButton1Click:Connect(function()
+        MainFrame.Visible = true
+        MiniIcon.Visible = false
     end)
 
     CloseBtn.MouseButton1Click:Connect(function()
         ScreenGui:Destroy()
     end)
+
+    if Settings.Misc.AntiAFK then
+        local VirtualUser = game:GetService("VirtualUser")
+        LP.Idled:Connect(function()
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new())
+        end)
+    end
 end
-	buildUI()
+
+buildUI()
