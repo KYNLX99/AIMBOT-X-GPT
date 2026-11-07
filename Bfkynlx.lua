@@ -1,175 +1,298 @@
--- [Cancer666] Blox Fruits Rayfield Instrumentation
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-
+-- [Cancer666] Blox Fruits Self-Contained Overlay
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 
 local LocalPlayer = Players.LocalPlayer
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local Humanoid = Character:WaitForChild("Humanoid")
 local RootPart = Character:WaitForChild("HumanoidRootPart")
 
 local State = {
     AutoFarm = false,
     AutoBoss = false,
     AutoFruit = false,
-    AutoCollectMoney = false,
     ESP = false,
     FarmRadius = 250,
-    AttackDelay = 0.4,
     TargetBoss = "Diamond"
 }
 
-local Window = Rayfield:CreateWindow({
-   Name = "CF OVERLAY | Cancer666",
-   LoadingTitle = "Blox Fruits Instrumentation",
-   LoadingSubtitle = "by Cancer666",
-   ConfigurationSaving = {
-      Enabled = true,
-      FolderName = "CF_Overlay",
-      FileName = "Config"
-   },
-   KeySystem = false,
-})
+-- === UI CORE ===
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "CF_RayfieldClone"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
-local CombatTab = Window:CreateTab("Combat", 4483362458)
-local VisualTab = Window:CreateTab("Visual", 3944610415)
-local TeleportTab = Window:CreateTab("Teleport", 4483362458)
-local SettingsTab = Window:CreateTab("Settings", 4483362458)
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "Main"
+MainFrame.Size = UDim2.new(0, 500, 0, 350)
+MainFrame.Position = UDim2.new(0.5, -250, 0.5, -175)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
 
--- Combat Section
-local FarmSection = CombatTab:CreateSection("Farming")
+-- Dragging
+local dragging, dragInput, dragStart, startPos
+local function update(input)
+    local delta = input.Position - dragStart
+    MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+MainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+MainFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then update(input) end
+end)
 
-local AutoFarmToggle = FarmSection:CreateToggle({
-   Name = "Auto Farm Enemies",
-   CurrentValue = false,
-   Flag = "AutoFarm",
-   Callback = function(Value)
-      State.AutoFarm = Value
-      if Value then State.AutoBoss = false end
-   end,
-})
+-- Sidebar
+local SideBar = Instance.new("Frame")
+SideBar.Size = UDim2.new(0, 120, 1, 0)
+SideBar.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+SideBar.BorderSizePixel = 0
+SideBar.Parent = MainFrame
+Instance.new("UICorner", SideBar).CornerRadius = UDim.new(0, 8)
 
-local AutoBossToggle = FarmSection:CreateToggle({
-   Name = "Auto Farm Boss",
-   CurrentValue = false,
-   Flag = "AutoBoss",
-   Callback = function(Value)
-      State.AutoBoss = Value
-      if Value then State.AutoFarm = false end
-   end,
-})
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundColor3 = Color3.fromRGB(255, 40, 40)
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
+Title.Text = "CF OVERLAY"
+Title.Parent = SideBar
+Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 8)
 
-local BossDropdown = FarmSection:CreateDropdown({
-   Name = "Target Boss",
-   CurrentOption = {"Diamond"},
-   Options = {"Diamond", "Saber Expert", "Gorilla King", "Smoke Admiral", "Katakuri", "Big Mom", "Kaido"},
-   Callback = function(Option)
-      State.TargetBoss = Option[1]
-   end,
-})
+local TabLayout = Instance.new("UIListLayout")
+TabLayout.Padding = UDim.new(0, 5)
+TabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+TabLayout.Parent = SideBar
 
-local AutoFruitToggle = FarmSection:CreateToggle({
-   Name = "Auto Snipe Fruit",
-   CurrentValue = false,
-   Flag = "AutoFruit",
-   Callback = function(Value)
-      State.AutoFruit = Value
-   end,
-})
+-- Content Area
+local ContentArea = Instance.new("Frame")
+ContentArea.Size = UDim2.new(1, -130, 1, -50)
+ContentArea.Position = UDim2.new(0, 125, 0, 45)
+ContentArea.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+ContentArea.BorderSizePixel = 0
+ContentArea.Parent = MainFrame
+Instance.new("UICorner", ContentArea).CornerRadius = UDim.new(0, 6)
 
-local RadiusSlider = FarmSection:CreateSlider({
-   Name = "Farm Radius",
-   Range = {50, 500},
-   Increment = 10,
-   Suffix = " studs",
-   CurrentValue = 250,
-   Flag = "FarmRadius",
-   Callback = function(Value)
-      State.FarmRadius = Value
-   end,
-})
+local ContentLayout = Instance.new("UIListLayout")
+ContentLayout.Padding = UDim.new(0, 10)
+ContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ContentLayout.Parent = ContentArea
 
--- Visual Section
-local ESPSection = VisualTab:CreateSection("ESP")
+-- UI Components Builder
+local function CreateTab(name, icon)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.9, 0, 0, 35)
+    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 14
+    btn.Text = name
+    btn.AutoButtonColor = false
+    btn.Parent = SideBar
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    
+    local tabFrame = Instance.new("ScrollingFrame")
+    tabFrame.Size = UDim2.new(1, -10, 1, 0)
+    tabFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    tabFrame.BorderSizePixel = 0
+    tabFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    tabFrame.Visible = false
+    tabFrame.Parent = ContentArea
+    Instance.new("UICorner", tabFrame).CornerRadius = UDim.new(0, 6)
+    
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 8)
+    layout.Parent = tabFrame
+    
+    btn.MouseButton1Click:Connect(function()
+        for _, child in pairs(ContentArea:GetChildren()) do
+            if child:IsA("ScrollingFrame") then child.Visible = false end
+        end
+        tabFrame.Visible = true
+    end)
+    
+    return tabFrame, layout
+end
 
-local ESPToggle = ESPSection:CreateToggle({
-   Name = "ESP All Entities",
-   CurrentValue = false,
-   Flag = "ESP",
-   Callback = function(Value)
-      State.ESP = Value
-      if not Value then
-         for _, v in pairs(Workspace:GetDescendants()) do
+local function CreateToggle(parent, name, default, callback)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, -10, 0, 40)
+    container.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+    container.BorderSizePixel = 0
+    container.Parent = parent
+    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -50, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(220, 220, 220)
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Text = name
+    label.Parent = container
+    
+    local toggleBg = Instance.new("Frame")
+    toggleBg.Size = UDim2.new(0, 40, 0, 20)
+    toggleBg.Position = UDim2.new(1, -45, 0.5, -10)
+    toggleBg.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
+    toggleBg.Parent = container
+    Instance.new("UICorner", toggleBg).CornerRadius = UDim.new(1, 0)
+    
+    local toggleCircle = Instance.new("Frame")
+    toggleCircle.Size = UDim2.new(0, 16, 0, 16)
+    toggleCircle.Position = UDim2.new(0, 2, 0.5, -8)
+    toggleCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    toggleCircle.Parent = toggleBg
+    Instance.new("UICorner", toggleCircle).CornerRadius = UDim.new(1, 0)
+    
+    local state = default
+    local function updateVisual()
+        toggleBg.BackgroundColor3 = state and Color3.fromRGB(255, 40, 40) or Color3.fromRGB(60, 60, 65)
+        TweenService:Create(toggleCircle, TweenInfo.new(0.2), {Position = UDim2.new(0, state and 22 or 2, 0.5, -8)}):Play()
+    end
+    updateVisual()
+    
+    container.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            state = not state
+            updateVisual()
+            callback(state)
+        end
+    end)
+end
+
+local function CreateSlider(parent, name, min, max, default, callback)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, -10, 0, 50)
+    container.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+    container.BorderSizePixel = 0
+    container.Parent = parent
+    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -10, 0, 20)
+    label.Position = UDim2.new(0, 10, 0, 5)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(220, 220, 220)
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Text = name .. ": " .. default
+    label.Parent = container
+    
+    local sliderBg = Instance.new("Frame")
+    sliderBg.Size = UDim2.new(1, -20, 0, 8)
+    sliderBg.Position = UDim2.new(0, 10, 1, -20)
+    sliderBg.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
+    sliderBg.Parent = container
+    Instance.new("UICorner", sliderBg).CornerRadius = UDim.new(1, 0)
+    
+    local sliderFill = Instance.new("Frame")
+    sliderFill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+    sliderFill.BackgroundColor3 = Color3.fromRGB(255, 40, 40)
+    sliderFill.Parent = sliderBg
+    Instance.new("UICorner", sliderFill).CornerRadius = UDim.new(1, 0)
+    
+    local dragging = false
+    local function updateSlider(input)
+        local percent = math.clamp((input.Position.X - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X, 0, 1)
+        local value = math.floor(min + (max - min) * percent)
+        sliderFill.Size = UDim2.new(percent, 0, 1, 0)
+        label.Text = name .. ": " .. value
+        callback(value)
+    end
+    
+    sliderBg.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            updateSlider(input)
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            updateSlider(input)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+end
+
+local function CreateButton(parent, name, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -10, 0, 40)
+    btn.BackgroundColor3 = Color3.fromRGB(255, 40, 40)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 14
+    btn.Text = name
+    btn.AutoButtonColor = false
+    btn.Parent = parent
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    
+    btn.MouseButton1Click:Connect(callback)
+end
+
+-- === TABS & FEATURES ===
+local CombatTab, CombatLayout = CreateTab("Combat", "")
+local VisualTab, VisualLayout = CreateTab("Visual", "")
+local TeleportTab, TeleportLayout = CreateTab("Teleport", "")
+
+CreateToggle(CombatTab, "Auto Farm Enemies", false, function(val) State.AutoFarm = val; if val then State.AutoBoss = false end end)
+CreateToggle(CombatTab, "Auto Farm Boss", false, function(val) State.AutoBoss = val; if val then State.AutoFarm = false end end)
+CreateToggle(CombatTab, "Auto Snipe Fruit", false, function(val) State.AutoFruit = val end)
+CreateSlider(CombatTab, "Farm Radius", 50, 500, 250, function(val) State.FarmRadius = val end)
+
+CreateToggle(VisualTab, "ESP All Entities", false, function(val) 
+    State.ESP = val 
+    if not val then
+        for _, v in pairs(Workspace:GetDescendants()) do
             if v:FindFirstChild("CF_ESP") then v.CF_ESP:Destroy() end
-         end
-      end
-   end,
-})
+        end
+    end
+end)
 
-local ESPColorPicker = ESPSection:CreateColorPicker({
-   Name = "ESP Color",
-   Color = Color3.fromRGB(255, 0, 0),
-   Flag = "ESPColor",
-   Callback = function(Value)
-      for _, v in pairs(Workspace:GetDescendants()) do
-         if v:FindFirstChild("CF_ESP") then
-            v.CF_ESP.FillColor = Value
-         end
-      end
-   end,
-})
-
--- Teleport Section
-local TeleSection = TeleportTab:CreateSection("Quick Teleport")
-
-TeleSection:CreateButton({
-   Name = "TP to Nearest Fruit",
-   Callback = function()
-      for _, v in pairs(Workspace:GetDescendants()) do
-         if v:IsA("Tool") and v.Name:find("Fruit") and v:FindFirstChild("Handle") then
+CreateButton(TeleportTab, "TP to Nearest Fruit", function()
+    for _, v in pairs(Workspace:GetDescendants()) do
+        if v:IsA("Tool") and v.Name:find("Fruit") and v:FindFirstChild("Handle") then
             RootPart.CFrame = v.Handle.CFrame
-            Rayfield:Notify({Title = "Teleport", Content = "Teleported to " .. v.Name, Duration = 3})
             break
-         end
-      end
-   end,
-})
+        end
+    end
+end)
+CreateButton(TeleportTab, "TP to Marine Base", function()
+    local marine = Workspace:FindFirstChild("Marine", true)
+    if marine then RootPart.CFrame = marine.CFrame + Vector3.new(0, 5, 0) end
+end)
 
-TeleSection:CreateButton({
-   Name = "TP to Marine Base",
-   Callback = function()
-      local marine = Workspace:FindFirstChild("Marine", true)
-      if marine then RootPart.CFrame = marine.CFrame + Vector3.new(0, 5, 0) end
-   end,
-})
-
-TeleSection:CreateButton({
-   Name = "TP to Pirate Base",
-   Callback = function()
-      local pirate = Workspace:FindFirstChild("Pirate", true)
-      if pirate then RootPart.CFrame = pirate.CFrame + Vector3.new(0, 5, 0) end
-   end,
-})
-
--- Settings Section
-local SettingsSection = SettingsTab:CreateSection("Script Settings")
-
-SettingsSection:CreateButton({
-   Name = "Destroy Script",
-   Callback = function()
-      Rayfield:Destroy()
-   end,
-})
-
--- Core Logic
+-- === CORE LOGIC ===
 local function getTarget(isBoss)
     local closest, minDist = nil, math.huge
     for _, v in pairs(Workspace:GetDescendants()) do
         if v:IsA("Model") and v:FindFirstChild("HumanoidRootPart") and v:FindFirstChild("Humanoid") then
             local name = v.Name:lower()
-            local isEnemy = name:find("enemy") or name:find("boss") or v:FindFirstChild("Enemy")
             if isBoss then
                 if name:find(State.TargetBoss:lower()) or v.Humanoid.MaxHealth > 5000 then
                     local dist = (v.HumanoidRootPart.Position - RootPart.Position).Magnitude
@@ -225,4 +348,10 @@ RunService.Heartbeat:Connect(function()
     if State.ESP then updateESP() end
 end)
 
-Rayfield:Notify({Title = "Loaded", Content = "CF Overlay by Cancer666", Duration = 5})
+-- Default tab
+for _, child in pairs(ContentArea:GetChildren()) do
+    if child:IsA("ScrollingFrame") then 
+        child.Visible = false 
+    end
+end
+CombatTab.Visible = true
