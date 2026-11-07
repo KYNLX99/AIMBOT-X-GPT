@@ -1,8 +1,9 @@
--- [Cancer666] Blox Fruits Instrumentation Overlay
+-- [Cancer666] Blox Fruits Rayfield Instrumentation
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
-local UserInputService = game:GetService("UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
@@ -13,61 +14,156 @@ local State = {
     AutoFarm = false,
     AutoBoss = false,
     AutoFruit = false,
+    AutoCollectMoney = false,
     ESP = false,
     FarmRadius = 250,
-    AttackDelay = 0.4
+    AttackDelay = 0.4,
+    TargetBoss = "Diamond"
 }
 
--- UI Setup
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "CF_Overlay"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ScreenGui.Parent = LocalPlayer.PlayerGui
+local Window = Rayfield:CreateWindow({
+   Name = "CF OVERLAY | Cancer666",
+   LoadingTitle = "Blox Fruits Instrumentation",
+   LoadingSubtitle = "by Cancer666",
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = "CF_Overlay",
+      FileName = "Config"
+   },
+   KeySystem = false,
+})
 
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "Main"
-MainFrame.Size = UDim2.new(0, 220, 0, 300)
-MainFrame.Position = UDim2.new(0.5, -110, 0.5, -150)
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-MainFrame.BorderSizePixel = 0
-MainFrame.Parent = ScreenGui
+local CombatTab = Window:CreateTab("Combat", 4483362458)
+local VisualTab = Window:CreateTab("Visual", 3944610415)
+local TeleportTab = Window:CreateTab("Teleport", 4483362458)
+local SettingsTab = Window:CreateTab("Settings", 4483362458)
 
-local Corner = Instance.new("UICorner")
-Corner.CornerRadius = UDim.new(0, 8)
-Corner.Parent = MainFrame
+-- Combat Section
+local FarmSection = CombatTab:CreateSection("Farming")
 
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 35)
-Title.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-Title.TextColor3 = Color3.fromRGB(255, 50, 50)
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 16
-Title.Text = "CF OVERLAY"
-Title.Parent = MainFrame
+local AutoFarmToggle = FarmSection:CreateToggle({
+   Name = "Auto Farm Enemies",
+   CurrentValue = false,
+   Flag = "AutoFarm",
+   Callback = function(Value)
+      State.AutoFarm = Value
+      if Value then State.AutoBoss = false end
+   end,
+})
 
-local Layout = Instance.new("UIListLayout")
-Layout.Padding = UDim.new(0, 5)
-Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-Layout.Parent = MainFrame
+local AutoBossToggle = FarmSection:CreateToggle({
+   Name = "Auto Farm Boss",
+   CurrentValue = false,
+   Flag = "AutoBoss",
+   Callback = function(Value)
+      State.AutoBoss = Value
+      if Value then State.AutoFarm = false end
+   end,
+})
 
--- Button factory
-local function createButton(text, callback)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.9, 0, 0, 35)
-    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
-    btn.Font = Enum.Font.Gotham
-    btn.TextSize = 14
-    btn.Text = text
-    btn.AutoButtonColor = false
-    btn.Parent = MainFrame
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-    btn.MouseButton1Click:Connect(callback)
-    return btn
-end
+local BossDropdown = FarmSection:CreateDropdown({
+   Name = "Target Boss",
+   CurrentOption = {"Diamond"},
+   Options = {"Diamond", "Saber Expert", "Gorilla King", "Smoke Admiral", "Katakuri", "Big Mom", "Kaido"},
+   Callback = function(Option)
+      State.TargetBoss = Option[1]
+   end,
+})
 
--- Logic
+local AutoFruitToggle = FarmSection:CreateToggle({
+   Name = "Auto Snipe Fruit",
+   CurrentValue = false,
+   Flag = "AutoFruit",
+   Callback = function(Value)
+      State.AutoFruit = Value
+   end,
+})
+
+local RadiusSlider = FarmSection:CreateSlider({
+   Name = "Farm Radius",
+   Range = {50, 500},
+   Increment = 10,
+   Suffix = " studs",
+   CurrentValue = 250,
+   Flag = "FarmRadius",
+   Callback = function(Value)
+      State.FarmRadius = Value
+   end,
+})
+
+-- Visual Section
+local ESPSection = VisualTab:CreateSection("ESP")
+
+local ESPToggle = ESPSection:CreateToggle({
+   Name = "ESP All Entities",
+   CurrentValue = false,
+   Flag = "ESP",
+   Callback = function(Value)
+      State.ESP = Value
+      if not Value then
+         for _, v in pairs(Workspace:GetDescendants()) do
+            if v:FindFirstChild("CF_ESP") then v.CF_ESP:Destroy() end
+         end
+      end
+   end,
+})
+
+local ESPColorPicker = ESPSection:CreateColorPicker({
+   Name = "ESP Color",
+   Color = Color3.fromRGB(255, 0, 0),
+   Flag = "ESPColor",
+   Callback = function(Value)
+      for _, v in pairs(Workspace:GetDescendants()) do
+         if v:FindFirstChild("CF_ESP") then
+            v.CF_ESP.FillColor = Value
+         end
+      end
+   end,
+})
+
+-- Teleport Section
+local TeleSection = TeleportTab:CreateSection("Quick Teleport")
+
+TeleSection:CreateButton({
+   Name = "TP to Nearest Fruit",
+   Callback = function()
+      for _, v in pairs(Workspace:GetDescendants()) do
+         if v:IsA("Tool") and v.Name:find("Fruit") and v:FindFirstChild("Handle") then
+            RootPart.CFrame = v.Handle.CFrame
+            Rayfield:Notify({Title = "Teleport", Content = "Teleported to " .. v.Name, Duration = 3})
+            break
+         end
+      end
+   end,
+})
+
+TeleSection:CreateButton({
+   Name = "TP to Marine Base",
+   Callback = function()
+      local marine = Workspace:FindFirstChild("Marine", true)
+      if marine then RootPart.CFrame = marine.CFrame + Vector3.new(0, 5, 0) end
+   end,
+})
+
+TeleSection:CreateButton({
+   Name = "TP to Pirate Base",
+   Callback = function()
+      local pirate = Workspace:FindFirstChild("Pirate", true)
+      if pirate then RootPart.CFrame = pirate.CFrame + Vector3.new(0, 5, 0) end
+   end,
+})
+
+-- Settings Section
+local SettingsSection = SettingsTab:CreateSection("Script Settings")
+
+SettingsSection:CreateButton({
+   Name = "Destroy Script",
+   Callback = function()
+      Rayfield:Destroy()
+   end,
+})
+
+-- Core Logic
 local function getTarget(isBoss)
     local closest, minDist = nil, math.huge
     for _, v in pairs(Workspace:GetDescendants()) do
@@ -75,7 +171,7 @@ local function getTarget(isBoss)
             local name = v.Name:lower()
             local isEnemy = name:find("enemy") or name:find("boss") or v:FindFirstChild("Enemy")
             if isBoss then
-                if name:find("boss") or v.Humanoid.MaxHealth > 5000 then
+                if name:find(State.TargetBoss:lower()) or v.Humanoid.MaxHealth > 5000 then
                     local dist = (v.HumanoidRootPart.Position - RootPart.Position).Magnitude
                     if dist < minDist and dist < State.FarmRadius then closest, minDist = v, dist end
                 end
@@ -109,7 +205,6 @@ local function updateESP()
     end
 end
 
--- Loops
 RunService.Heartbeat:Connect(function()
     if State.AutoFarm or State.AutoBoss then
         local target = getTarget(State.AutoBoss)
@@ -121,7 +216,7 @@ RunService.Heartbeat:Connect(function()
     end
     if State.AutoFruit then
         for _, v in pairs(Workspace:GetDescendants()) do
-            if v:IsA("Tool") and v.Name:find("Fruit") then
+            if v:IsA("Tool") and v.Name:find("Fruit") and v:FindFirstChild("Handle") then
                 RootPart.CFrame = v.Handle.CFrame
                 break
             end
@@ -130,26 +225,4 @@ RunService.Heartbeat:Connect(function()
     if State.ESP then updateESP() end
 end)
 
--- Bindings
-createButton("Auto Farm [Toggle]", function()
-    State.AutoFarm = not State.AutoFarm
-    State.AutoBoss = false
-end)
-createButton("Auto Boss [Toggle]", function()
-    State.AutoBoss = not State.AutoBoss
-    State.AutoFarm = false
-end)
-createButton("Snipe Fruit [Toggle]", function()
-    State.AutoFruit = not State.AutoFruit
-end)
-createButton("ESP All [Toggle]", function()
-    State.ESP = not State.ESP
-    if not State.ESP then
-        for _, v in pairs(Workspace:GetDescendants()) do
-            if v:FindFirstChild("CF_ESP") then v.CF_ESP:Destroy() end
-        end
-    end
-end)
-createButton("Destroy GUI", function()
-    ScreenGui:Destroy()
-end)
+Rayfield:Notify({Title = "Loaded", Content = "CF Overlay by Cancer666", Duration = 5})
