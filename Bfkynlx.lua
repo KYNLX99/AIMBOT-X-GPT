@@ -1,357 +1,614 @@
--- [Cancer666] Blox Fruits Self-Contained Overlay
+--[[
+    Blox Fruits - Full Feature Script
+    UI Library: Rayfield
+    Target: Blox Fruits (Latest)
+]]
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "Blox Fruits | Full",
+    LoadingTitle = "Blox Fruits Script",
+    LoadingSubtitle = "by J",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "BloxFruitsConfig",
+        FileName = "FullConfig"
+    },
+    Discord = {
+        Enabled = false,
+    },
+    KeySystem = false
+})
+
+-- Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 
 local LocalPlayer = Players.LocalPlayer
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local RootPart = Character:WaitForChild("HumanoidRootPart")
+local Humanoid = Character:WaitForChild("Humanoid")
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
-local State = {
-    AutoFarm = false,
-    AutoBoss = false,
-    AutoFruit = false,
-    ESP = false,
-    FarmRadius = 250,
-    TargetBoss = "Diamond"
+-- Anti AFK
+LocalPlayer.Idled:Connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new())
+end)
+
+-- Variables
+local FastAttack = false
+local AutoFarm = false
+local AutoBuso = false
+local AutoKen = false
+local AutoHaki = false
+local BringMob = false
+local AutoQuest = false
+local SelectedWeapon = "Melee"
+local SelectedMonster = "Bandit"
+local FarmDistance = 30
+local TweenSpeed = 175
+
+-- Function Helpers
+local function GetCharacter()
+    return LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+end
+
+local function GetHRP()
+    local char = GetCharacter()
+    return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+local function GetHumanoid()
+    local char = GetCharacter()
+    return char and char:FindFirstChild("Humanoid")
+end
+
+local function EquipWeapon(weapon)
+    local char = GetCharacter()
+    if not char then return end
+    local tool = LocalPlayer.Backpack:FindFirstChild(weapon) or char:FindFirstChild(weapon)
+    if tool then
+        Humanoid:EquipTool(tool)
+    end
+end
+
+local function TweenTo(targetCFrame)
+    local hrp = GetHRP()
+    if not hrp then return end
+    local distance = (hrp.Position - targetCFrame.Position).Magnitude
+    local tweenInfo = TweenInfo.new(distance / TweenSpeed, Enum.EasingStyle.Linear)
+    local tween = TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
+    tween:Play()
+    tween.Completed:Wait()
+end
+
+-- Fast Attack
+local function EnableFastAttack()
+    task.spawn(function()
+        while FastAttack do
+            local char = GetCharacter()
+            if char then
+                local tool = char:FindFirstChildOfClass("Tool")
+                if tool then
+                    tool:Activate()
+                end
+            end
+            task.wait(0.05)
+        end
+    end)
+end
+
+-- Auto Buso
+local function EnableAutoBuso()
+    task.spawn(function()
+        while AutoBuso do
+            local args = {
+                [1] = "Buso"
+            }
+            pcall(function()
+                ReplicatedStorage.Remotes.CommF_:InvokeServer(unpack(args))
+            end)
+            task.wait(1)
+        end
+    end)
+end
+
+-- Auto Ken
+local function EnableAutoKen()
+    task.spawn(function()
+        while AutoKen do
+            local args = {
+                [1] = "Ken"
+            }
+            pcall(function()
+                ReplicatedStorage.Remotes.CommF_:InvokeServer(unpack(args))
+            end)
+            task.wait(1)
+        end
+    end)
+end
+
+-- ===================== TABS =====================
+
+local MainTab = Window:CreateTab("Main", 4483362458)
+local FarmTab = Window:CreateTab("Farm", 4483362458)
+local CombatTab = Window:CreateTab("Combat", 4483362458)
+local TeleportTab = Window:CreateTab("Teleport", 4483362458)
+local StatsTab = Window:CreateTab("Stats", 4483362458)
+local MiscTab = Window:CreateTab("Misc", 4483362458)
+local SettingTab = Window:CreateTab("Settings", 4483362458)
+
+-- ===================== MAIN =====================
+
+MainTab:CreateSection("Player")
+
+MainTab:CreateToggle({
+    Name = "Auto Buso Haki",
+    CurrentValue = false,
+    Flag = "AutoBuso",
+    Callback = function(Value)
+        AutoBuso = Value
+        if Value then EnableAutoBuso() end
+    end
+})
+
+MainTab:CreateToggle({
+    Name = "Auto Ken Haki",
+    CurrentValue = false,
+    Flag = "AutoKen",
+    Callback = function(Value)
+        AutoKen = Value
+        if Value then EnableAutoKen() end
+    end
+})
+
+MainTab:CreateToggle({
+    Name = "Fast Attack",
+    CurrentValue = false,
+    Flag = "FastAttack",
+    Callback = function(Value)
+        FastAttack = Value
+        if Value then EnableFastAttack() end
+    end
+})
+
+MainTab:CreateButton({
+    Name = "Redeem All Codes",
+    Callback = function()
+        local codes = {
+            "SUB2GAMERROBOT_RESET",
+            "SUB2GAMERROBOT_EXP1",
+            "KittGaming",
+            "Sub2Fer999",
+            "Enyu_is_Pro",
+            "Magicbus",
+            "JCWK",
+            "StarcodeHEO",
+            "Bluxxy",
+            "SUB2OFFICIALNOOBIE",
+            "THEGREATACE",
+            "SUB2NOOBMASTER123",
+            "Sub2Daigrock",
+            "Axiore",
+            "TantaiGaming",
+            "StrawHatMaine",
+            "Sub2OfficialNoobie",
+            "Fudd10",
+            "Bignews",
+            "Fight4Academy",
+            "SUB2GAMERROBOT_RESET1",
+            "SUB2GAMERROBOT_EXP15"
+        }
+        for _, code in pairs(codes) do
+            pcall(function()
+                ReplicatedStorage.Remotes.Redeem:InvokeServer(code)
+            end)
+            task.wait(0.5)
+        end
+        Rayfield:Notify({
+            Title = "Codes",
+            Content = "All codes redeemed",
+            Duration = 5
+        })
+    end
+})
+
+-- ===================== FARM =====================
+
+FarmTab:CreateSection("Auto Farm")
+
+local MonsterList = {
+    "Bandit", "Trainee", "Monkey", "Gorilla", "Pirate", "Brute",
+    "Desert Bandit", "Desert Officer", "Snow Bandit", "Snowman",
+    "Chief Petty Officer", "Sky Bandit", "Dark Master", "Prisoner",
+    "Dangerous Prisoner", "Toga Warrior", "Gladiator", "Military Soldier",
+    "Military Spy", "Fishman Warrior", "Fishman Commando", "God's Guard",
+    "Shanda", "Royal Soldier", "Royal Soldier", "Marine", "Lab Subordinate",
+    "Horned Warrior", "Magma Ninja", "Lava Pirate", "Ship Deckhand",
+    "Ship Engineer", "Ship Steward", "Ship Officer", "Arctic Warrior",
+    "Snow Lurker", "Sea Soldier", "Water Fighter", "Female Raider",
+    "Male Raider", "Giant Island Raider", "Pirate Millionaire", "Pistol Billionaire",
+    "Dragon Crew Warrior", "Dragon Crew Archer", "Reborn Skeleton", "Living Zombie",
+    "Demonic Soul", "Posessed Mummy", "Peanut Scout", "Peanut President",
+    "Ice Cream Chef", "Ice Cream Commander", "Cookie Crafter", "Cake Guard",
+    "Baking Staff", "Head Baker", "Cocoa Warrior", "Chocolate Bar Battler",
+    "Sweet Thief", "Candy Rebel", "Candy Pirate", "Snow Demon"
 }
 
--- === UI CORE ===
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "CF_RayfieldClone"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+FarmTab:CreateDropdown({
+    Name = "Select Monster",
+    Options = MonsterList,
+    CurrentOption = {"Bandit"},
+    MultipleOptions = false,
+    Flag = "SelectedMonster",
+    Callback = function(Option)
+        SelectedMonster = Option[1]
+    end
+})
 
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "Main"
-MainFrame.Size = UDim2.new(0, 500, 0, 350)
-MainFrame.Position = UDim2.new(0.5, -250, 0.5, -175)
-MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-MainFrame.BorderSizePixel = 0
-MainFrame.Parent = ScreenGui
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
+FarmTab:CreateDropdown({
+    Name = "Select Weapon",
+    Options = {"Melee", "Sword", "Gun", "Fruit"},
+    CurrentOption = {"Melee"},
+    MultipleOptions = false,
+    Flag = "SelectedWeapon",
+    Callback = function(Option)
+        SelectedWeapon = Option[1]
+    end
+})
 
--- Dragging
-local dragging, dragInput, dragStart, startPos
-local function update(input)
-    local delta = input.Position - dragStart
-    MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-end
-MainFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = MainFrame.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+FarmTab:CreateSlider({
+    Name = "Farm Distance",
+    Range = {10, 100},
+    Increment = 5,
+    Suffix = "Studs",
+    CurrentValue = 30,
+    Flag = "FarmDistance",
+    Callback = function(Value)
+        FarmDistance = Value
+    end
+})
+
+FarmTab:CreateToggle({
+    Name = "Auto Farm Monster",
+    CurrentValue = false,
+    Flag = "AutoFarm",
+    Callback = function(Value)
+        AutoFarm = Value
+        if Value then
+            task.spawn(function()
+                while AutoFarm do
+                    pcall(function()
+                        local monsters = {}
+                        for _, v in pairs(workspace.Enemies:GetChildren()) do
+                            if v.Name == SelectedMonster and v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 then
+                                table.insert(monsters, v)
+                            end
+                        end
+                        
+                        if #monsters > 0 then
+                            local target = monsters[1]
+                            local hrp = GetHRP()
+                            if hrp and target:FindFirstChild("HumanoidRootPart") then
+                                -- Bring Mob
+                                if BringMob then
+                                    target.HumanoidRootPart.CFrame = hrp.CFrame * CFrame.new(0, 0, -FarmDistance)
+                                else
+                                    TweenTo(target.HumanoidRootPart.CFrame * CFrame.new(0, 0, FarmDistance))
+                                end
+                                
+                                -- Equip & Attack
+                                if SelectedWeapon == "Melee" then
+                                    EquipWeapon("Combat")
+                                end
+                                
+                                local tool = GetCharacter():FindFirstChildOfClass("Tool")
+                                if tool then
+                                    tool:Activate()
+                                end
+                            end
+                        end
+                    end)
+                    task.wait(0.1)
+                end
+            end)
+        end
+    end
+})
+
+FarmTab:CreateToggle({
+    Name = "Bring Mob",
+    CurrentValue = false,
+    Flag = "BringMob",
+    Callback = function(Value)
+        BringMob = Value
+    end
+})
+
+FarmTab:CreateToggle({
+    Name = "Auto Quest",
+    CurrentValue = false,
+    Flag = "AutoQuest",
+    Callback = function(Value)
+        AutoQuest = Value
+    end
+})
+
+-- ===================== COMBAT =====================
+
+CombatTab:CreateSection("Combat")
+
+CombatTab:CreateToggle({
+    Name = "Kill Aura",
+    CurrentValue = false,
+    Flag = "KillAura",
+    Callback = function(Value)
+        getgenv().KillAura = Value
+        task.spawn(function()
+            while getgenv().KillAura do
+                pcall(function()
+                    for _, v in pairs(workspace.Enemies:GetChildren()) do
+                        if v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 then
+                            local hrp = GetHRP()
+                            if hrp and (hrp.Position - v.HumanoidRootPart.Position).Magnitude < 50 then
+                                local tool = GetCharacter():FindFirstChildOfClass("Tool")
+                                if tool then
+                                    tool:Activate()
+                                end
+                            end
+                        end
+                    end
+                end)
+                task.wait(0.1)
+            end
         end)
     end
-end)
-MainFrame.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        dragInput = input
+})
+
+CombatTab:CreateButton({
+    Name = "Aimbot (Hold Right Click)",
+    Callback = function()
+        Rayfield:Notify({
+            Title = "Aimbot",
+            Content = "Hold Right Mouse Button to lock",
+            Duration = 5
+        })
     end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then update(input) end
-end)
+})
 
--- Sidebar
-local SideBar = Instance.new("Frame")
-SideBar.Size = UDim2.new(0, 120, 1, 0)
-SideBar.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-SideBar.BorderSizePixel = 0
-SideBar.Parent = MainFrame
-Instance.new("UICorner", SideBar).CornerRadius = UDim.new(0, 8)
+-- ===================== TELEPORT =====================
 
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.BackgroundColor3 = Color3.fromRGB(255, 40, 40)
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 16
-Title.Text = "CF OVERLAY"
-Title.Parent = SideBar
-Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 8)
+TeleportTab:CreateSection("Islands")
 
-local TabLayout = Instance.new("UIListLayout")
-TabLayout.Padding = UDim.new(0, 5)
-TabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-TabLayout.Parent = SideBar
+local Islands = {
+    ["Start Island"] = CFrame.new(1100, 20, 1400),
+    ["Marine Starter"] = CFrame.new(-2600, 20, 2000),
+    ["Middle Town"] = CFrame.new(-520, 20, 1600),
+    ["Jungle"] = CFrame.new(-1600, 20, 1400),
+    ["Pirate Village"] = CFrame.new(-1100, 20, 3800),
+    ["Desert"] = CFrame.new(1100, 20, 4400),
+    ["Frozen Village"] = CFrame.new(1100, 20, 6000),
+    ["Marine Fortress"] = CFrame.new(-4500, 20, 4200),
+    ["Skylands"] = CFrame.new(-4600, 20, -2200),
+    ["Prison"] = CFrame.new(4800, 20, 700),
+    ["Colosseum"] = CFrame.new(-1500, 20, -2800),
+    ["Magma Village"] = CFrame.new(-5200, 20, 8400),
+    ["Underwater City"] = CFrame.new(3900, 20, -1800),
+    ["Fountain City"] = CFrame.new(5100, 20, 4000),
+    ["Phoenix Island"] = CFrame.new(5800, 20, -1000),
+    ["Haunted Island"] = CFrame.new(-9500, 20, 6000),
+    ["Sea of Treats"] = CFrame.new(-1000, 20, -10000),
+    ["Tiki Outpost"] = CFrame.new(-16500, 20, 500),
+}
 
--- Content Area
-local ContentArea = Instance.new("Frame")
-ContentArea.Size = UDim2.new(1, -130, 1, -50)
-ContentArea.Position = UDim2.new(0, 125, 0, 45)
-ContentArea.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-ContentArea.BorderSizePixel = 0
-ContentArea.Parent = MainFrame
-Instance.new("UICorner", ContentArea).CornerRadius = UDim.new(0, 6)
-
-local ContentLayout = Instance.new("UIListLayout")
-ContentLayout.Padding = UDim.new(0, 10)
-ContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
-ContentLayout.Parent = ContentArea
-
--- UI Components Builder
-local function CreateTab(name, icon)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.9, 0, 0, 35)
-    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
-    btn.Font = Enum.Font.Gotham
-    btn.TextSize = 14
-    btn.Text = name
-    btn.AutoButtonColor = false
-    btn.Parent = SideBar
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-    
-    local tabFrame = Instance.new("ScrollingFrame")
-    tabFrame.Size = UDim2.new(1, -10, 1, 0)
-    tabFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-    tabFrame.BorderSizePixel = 0
-    tabFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-    tabFrame.Visible = false
-    tabFrame.Parent = ContentArea
-    Instance.new("UICorner", tabFrame).CornerRadius = UDim.new(0, 6)
-    
-    local layout = Instance.new("UIListLayout")
-    layout.Padding = UDim.new(0, 8)
-    layout.Parent = tabFrame
-    
-    btn.MouseButton1Click:Connect(function()
-        for _, child in pairs(ContentArea:GetChildren()) do
-            if child:IsA("ScrollingFrame") then child.Visible = false end
+for name, cf in pairs(Islands) do
+    TeleportTab:CreateButton({
+        Name = name,
+        Callback = function()
+            TweenTo(cf)
         end
-        tabFrame.Visible = true
-    end)
-    
-    return tabFrame, layout
+    })
 end
 
-local function CreateToggle(parent, name, default, callback)
-    local container = Instance.new("Frame")
-    container.Size = UDim2.new(1, -10, 0, 40)
-    container.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
-    container.BorderSizePixel = 0
-    container.Parent = parent
-    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
-    
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, -50, 1, 0)
-    label.Position = UDim2.new(0, 10, 0, 0)
-    label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.fromRGB(220, 220, 220)
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 14
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Text = name
-    label.Parent = container
-    
-    local toggleBg = Instance.new("Frame")
-    toggleBg.Size = UDim2.new(0, 40, 0, 20)
-    toggleBg.Position = UDim2.new(1, -45, 0.5, -10)
-    toggleBg.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
-    toggleBg.Parent = container
-    Instance.new("UICorner", toggleBg).CornerRadius = UDim.new(1, 0)
-    
-    local toggleCircle = Instance.new("Frame")
-    toggleCircle.Size = UDim2.new(0, 16, 0, 16)
-    toggleCircle.Position = UDim2.new(0, 2, 0.5, -8)
-    toggleCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    toggleCircle.Parent = toggleBg
-    Instance.new("UICorner", toggleCircle).CornerRadius = UDim.new(1, 0)
-    
-    local state = default
-    local function updateVisual()
-        toggleBg.BackgroundColor3 = state and Color3.fromRGB(255, 40, 40) or Color3.fromRGB(60, 60, 65)
-        TweenService:Create(toggleCircle, TweenInfo.new(0.2), {Position = UDim2.new(0, state and 22 or 2, 0.5, -8)}):Play()
-    end
-    updateVisual()
-    
-    container.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            state = not state
-            updateVisual()
-            callback(state)
-        end
-    end)
-end
+-- ===================== STATS =====================
 
-local function CreateSlider(parent, name, min, max, default, callback)
-    local container = Instance.new("Frame")
-    container.Size = UDim2.new(1, -10, 0, 50)
-    container.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
-    container.BorderSizePixel = 0
-    container.Parent = parent
-    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
-    
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, -10, 0, 20)
-    label.Position = UDim2.new(0, 10, 0, 5)
-    label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.fromRGB(220, 220, 220)
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 14
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Text = name .. ": " .. default
-    label.Parent = container
-    
-    local sliderBg = Instance.new("Frame")
-    sliderBg.Size = UDim2.new(1, -20, 0, 8)
-    sliderBg.Position = UDim2.new(0, 10, 1, -20)
-    sliderBg.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
-    sliderBg.Parent = container
-    Instance.new("UICorner", sliderBg).CornerRadius = UDim.new(1, 0)
-    
-    local sliderFill = Instance.new("Frame")
-    sliderFill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
-    sliderFill.BackgroundColor3 = Color3.fromRGB(255, 40, 40)
-    sliderFill.Parent = sliderBg
-    Instance.new("UICorner", sliderFill).CornerRadius = UDim.new(1, 0)
-    
-    local dragging = false
-    local function updateSlider(input)
-        local percent = math.clamp((input.Position.X - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X, 0, 1)
-        local value = math.floor(min + (max - min) * percent)
-        sliderFill.Size = UDim2.new(percent, 0, 1, 0)
-        label.Text = name .. ": " .. value
-        callback(value)
-    end
-    
-    sliderBg.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            updateSlider(input)
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            updateSlider(input)
-        end
-    end)
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
-        end
-    end)
-end
+StatsTab:CreateSection("Auto Stats")
 
-local function CreateButton(parent, name, callback)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -10, 0, 40)
-    btn.BackgroundColor3 = Color3.fromRGB(255, 40, 40)
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 14
-    btn.Text = name
-    btn.AutoButtonColor = false
-    btn.Parent = parent
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-    
-    btn.MouseButton1Click:Connect(callback)
-end
+local Stats = {"Melee", "Defense", "Sword", "Gun", "Demon Fruit"}
 
--- === TABS & FEATURES ===
-local CombatTab, CombatLayout = CreateTab("Combat", "")
-local VisualTab, VisualLayout = CreateTab("Visual", "")
-local TeleportTab, TeleportLayout = CreateTab("Teleport", "")
-
-CreateToggle(CombatTab, "Auto Farm Enemies", false, function(val) State.AutoFarm = val; if val then State.AutoBoss = false end end)
-CreateToggle(CombatTab, "Auto Farm Boss", false, function(val) State.AutoBoss = val; if val then State.AutoFarm = false end end)
-CreateToggle(CombatTab, "Auto Snipe Fruit", false, function(val) State.AutoFruit = val end)
-CreateSlider(CombatTab, "Farm Radius", 50, 500, 250, function(val) State.FarmRadius = val end)
-
-CreateToggle(VisualTab, "ESP All Entities", false, function(val) 
-    State.ESP = val 
-    if not val then
-        for _, v in pairs(Workspace:GetDescendants()) do
-            if v:FindFirstChild("CF_ESP") then v.CF_ESP:Destroy() end
-        end
-    end
-end)
-
-CreateButton(TeleportTab, "TP to Nearest Fruit", function()
-    for _, v in pairs(Workspace:GetDescendants()) do
-        if v:IsA("Tool") and v.Name:find("Fruit") and v:FindFirstChild("Handle") then
-            RootPart.CFrame = v.Handle.CFrame
-            break
-        end
-    end
-end)
-CreateButton(TeleportTab, "TP to Marine Base", function()
-    local marine = Workspace:FindFirstChild("Marine", true)
-    if marine then RootPart.CFrame = marine.CFrame + Vector3.new(0, 5, 0) end
-end)
-
--- === CORE LOGIC ===
-local function getTarget(isBoss)
-    local closest, minDist = nil, math.huge
-    for _, v in pairs(Workspace:GetDescendants()) do
-        if v:IsA("Model") and v:FindFirstChild("HumanoidRootPart") and v:FindFirstChild("Humanoid") then
-            local name = v.Name:lower()
-            if isBoss then
-                if name:find(State.TargetBoss:lower()) or v.Humanoid.MaxHealth > 5000 then
-                    local dist = (v.HumanoidRootPart.Position - RootPart.Position).Magnitude
-                    if dist < minDist and dist < State.FarmRadius then closest, minDist = v, dist end
+for _, stat in pairs(Stats) do
+    StatsTab:CreateToggle({
+        Name = "Auto " .. stat,
+        CurrentValue = false,
+        Flag = "Auto" .. stat,
+        Callback = function(Value)
+            getgenv()["Auto"..stat] = Value
+            task.spawn(function()
+                while getgenv()["Auto"..stat] do
+                    pcall(function()
+                        local args = {
+                            [1] = "AddPoint",
+                            [2] = stat,
+                            [3] = 1
+                        }
+                        ReplicatedStorage.Remotes.CommF_:InvokeServer(unpack(args))
+                    end)
+                    task.wait(0.3)
                 end
+            end)
+        end
+    })
+end
+
+-- ===================== MISC =====================
+
+MiscTab:CreateSection("Utility")
+
+MiscTab:CreateToggle({
+    Name = "Walk Speed",
+    CurrentValue = false,
+    Flag = "WalkSpeed",
+    Callback = function(Value)
+        getgenv().WalkSpeed = Value
+        task.spawn(function()
+            while getgenv().WalkSpeed do
+                local hum = GetHumanoid()
+                if hum then
+                    hum.WalkSpeed = 100
+                end
+                task.wait(0.1)
+            end
+            local hum = GetHumanoid()
+            if hum then hum.WalkSpeed = 16 end
+        end)
+    end
+})
+
+MiscTab:CreateToggle({
+    Name = "Jump Power",
+    CurrentValue = false,
+    Flag = "JumpPower",
+    Callback = function(Value)
+        getgenv().JumpPower = Value
+        task.spawn(function()
+            while getgenv().JumpPower do
+                local hum = GetHumanoid()
+                if hum then
+                    hum.JumpPower = 120
+                end
+                task.wait(0.1)
+            end
+            local hum = GetHumanoid()
+            if hum then hum.JumpPower = 50 end
+        end)
+    end
+})
+
+MiscTab:CreateToggle({
+    Name = "Infinite Energy",
+    CurrentValue = false,
+    Flag = "InfEnergy",
+    Callback = function(Value)
+        getgenv().InfEnergy = Value
+        task.spawn(function()
+            while getgenv().InfEnergy do
+                pcall(function()
+                    local char = GetCharacter()
+                    if char and char:FindFirstChild("Energy") then
+                        char.Energy.Value = char.Energy.MaxValue
+                    end
+                end)
+                task.wait(0.1)
+            end
+        end)
+    end
+})
+
+MiscTab:CreateButton({
+    Name = "Server Hop",
+    Callback = function()
+        local PlaceID = game.PlaceId
+        local AllIDs = {}
+        local foundAnything = ""
+        local actualHour = os.date("!*t").hour
+        local Deleted = false
+        local File = pcall(function()
+            AllIDs = HttpService:JSONDecode(readfile("NotSameServers.json"))
+        end)
+        if not File then
+            table.insert(AllIDs, actualHour)
+            writefile("NotSameServers.json", HttpService:JSONEncode(AllIDs))
+        end
+        function TPReturner()
+            local Site
+            if foundAnything == "" then
+                Site = HttpService:JSONDecode(game:HttpGet('https://games.roblox.com/v1/games/' .. PlaceID .. '/servers/Public?sortOrder=Asc&limit=100'))
             else
-                if not name:find("boss") and v.Humanoid.Health > 0 then
-                    local dist = (v.HumanoidRootPart.Position - RootPart.Position).Magnitude
-                    if dist < minDist and dist < State.FarmRadius then closest, minDist = v, dist end
+                Site = HttpService:JSONDecode(game:HttpGet('https://games.roblox.com/v1/games/' .. PlaceID .. '/servers/Public?sortOrder=Asc&limit=100&cursor=' .. foundAnything))
+            end
+            local ID = ""
+            if Site.nextPageCursor and Site.nextPageCursor ~= "null" and Site.nextPageCursor ~= nil then
+                foundAnything = Site.nextPageCursor
+            end
+            local num = 0
+            for i,v in pairs(Site.data) do
+                local Possible = true
+                ID = tostring(v.id)
+                if tonumber(v.maxPlayers) > tonumber(v.playing) then
+                    for _,Existing in pairs(AllIDs) do
+                        if num ~= 0 then
+                            if ID == tostring(Existing) then
+                                Possible = false
+                            end
+                        else
+                            if tonumber(actualHour) ~= tonumber(Existing) then
+                                local delFile = pcall(function()
+                                    delfile("NotSameServers.json")
+                                    AllIDs = {}
+                                    table.insert(AllIDs, actualHour)
+                                end)
+                            end
+                        end
+                        num = num + 1
+                    end
+                    if Possible == true then
+                        table.insert(AllIDs, ID)
+                        wait()
+                        pcall(function()
+                            writefile("NotSameServers.json", HttpService:JSONEncode(AllIDs))
+                            wait()
+                            game:GetService("TeleportService"):TeleportToPlaceInstance(PlaceID, ID, LocalPlayer)
+                        end)
+                        wait(4)
+                    end
                 end
             end
         end
+        TPReturner()
     end
-    return closest
-end
+})
 
-local function updateESP()
-    for _, v in pairs(Workspace:GetDescendants()) do
-        if v:IsA("Model") and v:FindFirstChild("HumanoidRootPart") and v ~= Character then
-            local hl = v:FindFirstChild("CF_ESP")
-            if State.ESP then
-                if not hl then
-                    hl = Instance.new("Highlight")
-                    hl.Name = "CF_ESP"
-                    hl.FillColor = Color3.fromRGB(255, 0, 0)
-                    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
-                    hl.Parent = v
-                end
-            elseif hl then
-                hl:Destroy()
-            end
-        end
+MiscTab:CreateButton({
+    Name = "Rejoin",
+    Callback = function()
+        TeleportService:Teleport(game.PlaceId, LocalPlayer)
     end
-end
+})
 
-RunService.Heartbeat:Connect(function()
-    if State.AutoFarm or State.AutoBoss then
-        local target = getTarget(State.AutoBoss)
-        if target and target:FindFirstChild("HumanoidRootPart") then
-            RootPart.CFrame = target.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
-            local tool = Character:FindFirstChildWhichIsA("Tool")
-            if tool then tool:Activate() end
-        end
-    end
-    if State.AutoFruit then
-        for _, v in pairs(Workspace:GetDescendants()) do
-            if v:IsA("Tool") and v.Name:find("Fruit") and v:FindFirstChild("Handle") then
-                RootPart.CFrame = v.Handle.CFrame
-                break
-            end
-        end
-    end
-    if State.ESP then updateESP() end
-end)
+-- ===================== SETTINGS =====================
 
--- Default tab
-for _, child in pairs(ContentArea:GetChildren()) do
-    if child:IsA("ScrollingFrame") then 
-        child.Visible = false 
+SettingTab:CreateSection("Config")
+
+SettingTab:CreateSlider({
+    Name = "Tween Speed",
+    Range = {50, 300},
+    Increment = 10,
+    Suffix = "",
+    CurrentValue = 175,
+    Flag = "TweenSpeed",
+    Callback = function(Value)
+        TweenSpeed = Value
     end
-end
-CombatTab.Visible = true
+})
+
+SettingTab:CreateButton({
+    Name = "Destroy GUI",
+    Callback = function()
+        Rayfield:Destroy()
+    end
+})
+
+Rayfield:Notify({
+    Title = "Blox Fruits",
+    Content = "Script Loaded Successfully",
+    Duration = 6
+})
+
+print("Blox Fruits Full Script Loaded")
